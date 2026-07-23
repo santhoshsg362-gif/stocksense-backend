@@ -2,6 +2,7 @@ package com.stocksense.backend.service;
 
 import com.stocksense.backend.config.JwtService;
 import com.stocksense.backend.dto.AuthResponse;
+import com.stocksense.backend.dto.LoginRequest;
 import com.stocksense.backend.dto.RegisterRequest;
 import com.stocksense.backend.model.User;
 import com.stocksense.backend.repository.UserRepository;
@@ -19,30 +20,48 @@ public class AuthService {
 
     public AuthResponse register(RegisterRequest request) {
 
-        // Check if email already exists
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already registered");
         }
 
-        // Build the User object
         User user = User.builder()
                 .fullName(request.getFullName())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .build();
 
-        // Save to database
         userRepository.save(user);
 
-        // Generate JWT token
         String token = jwtService.generateToken(user.getEmail());
 
-        // Return response
         return AuthResponse.builder()
                 .token(token)
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .message("Registration successful")
+                .build();
+    }
+
+    public AuthResponse login(LoginRequest request) {
+
+        // Step 1 - Find user by email
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Step 2 - Check if password matches the stored hash
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new RuntimeException("Invalid password");
+        }
+
+        // Step 3 - Generate a fresh JWT token
+        String token = jwtService.generateToken(user.getEmail());
+
+        // Step 4 - Return token and user info
+        return AuthResponse.builder()
+                .token(token)
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .message("Login successful")
                 .build();
     }
 }
